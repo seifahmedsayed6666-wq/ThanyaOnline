@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Android APK From ZIP
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   pull_request:
     branches:
       - main
-  workflow_dispatch:
+  workflow_dispatch: # يتيح لك تشغيل البناء يدوياً بأي وقت من الهاتف
 
 jobs:
   build:
@@ -23,16 +23,34 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Find and Grant execute permission for gradlew
+      - name: Unzip Project Files
         run: |
-          GRADLEW_PATH=$(find . -name gradlew)
-          echo "Found gradlew at: $GRADLEW_PATH"
-          chmod +x $GRADLEW_PATH
-          echo "BASE_DIR=$(dirname $GRADLEW_PATH)" >> $GITHUB_ENV
+          # البحث عن أي ملف ZIP في المستودع وفك ضغطه تلقائياً
+          ZIP_FILE=$(find . -name "*.zip" | head -n 1)
+          if [ -z "$ZIP_FILE" ]; then
+            echo "Error: No ZIP file found in the repository!"
+            exit 1
+          fi
+          echo "Unzipping $ZIP_FILE..."
+          unzip -o "$ZIP_FILE" -d .
+
+      - name: Detect Project Directory and Setup Gradle Wrapper
+        run: |
+          # البحث التلقائي عن المجلد المكتمل الذي يحتوي على إعدادات الأندرويد
+          PROJECT_DIR=$(dirname $(find . -name "settings.gradle" | head -n 1))
+          echo "Android project found at: $PROJECT_DIR"
+          cd "$PROJECT_DIR"
+          
+          # توليد ملفات وتشغيل Gradle بالسيرفر
+          gradle wrapper --gradle-version 8.9
+          chmod +x ./gradlew
+          
+          # حفظ المسار للخطوات التالية
+          echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
 
       - name: Build Debug APK
         run: |
-          cd ${{ env.BASE_DIR }}
+          cd ${{ env.PROJECT_DIR }}
           ./gradlew assembleDebug
 
       - name: Find and Upload APK Artifact
