@@ -7,7 +7,7 @@ on:
   pull_request:
     branches:
       - main
-  workflow_dispatch: # يتيح لك تشغيل البناء يدوياً بأي وقت من الهاتف
+  workflow_dispatch:
 
 jobs:
   build:
@@ -25,7 +25,6 @@ jobs:
 
       - name: Unzip Project Files
         run: |
-          # البحث عن أي ملف ZIP في المستودع وفك ضغطه تلقائياً
           ZIP_FILE=$(find . -name "*.zip" | head -n 1)
           if [ -z "$ZIP_FILE" ]; then
             echo "Error: No ZIP file found in the repository!"
@@ -36,17 +35,22 @@ jobs:
 
       - name: Detect Project Directory and Setup Gradle Wrapper
         run: |
-          # البحث التلقائي عن المجلد المكتمل الذي يحتوي على إعدادات الأندرويد
           PROJECT_DIR=$(dirname $(find . -name "settings.gradle" | head -n 1))
           echo "Android project found at: $PROJECT_DIR"
           cd "$PROJECT_DIR"
           
-          # توليد ملفات وتشغيل Gradle بالسيرفر
+          # توليد ملفات Gradle التنفيذية بالسيرفر
           gradle wrapper --gradle-version 8.9
           chmod +x ./gradlew
           
           # حفظ المسار للخطوات التالية
           echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
+
+      - name: Fix Duplicate Kotlin Classes
+        run: |
+          cd ${{ env.PROJECT_DIR }}
+          # حقن كود حل مشكلة تكرار مكتبات Kotlin داخل ملف build.gradle الافتراضي
+          sed -i '/dependencies {/a \    configurations.all { exclude group: "org.jetbrains.kotlin", module: "kotlin-stdlib-jdk8" \n exclude group: "org.jetbrains.kotlin", module: "kotlin-stdlib-jdk7" }' app/build.gradle
 
       - name: Build Debug APK
         run: |
