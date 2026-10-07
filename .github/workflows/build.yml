@@ -35,26 +35,37 @@ jobs:
 
       - name: Detect Project Directory and Setup Gradle Wrapper
         run: |
-          PROJECT_DIR=$(dirname $(find . -name "settings.gradle" | head -n 1))
-          echo "Android project found at: $PROJECT_DIR"
-          cd "$PROJECT_DIR"
+          # البحث عن ملف settings.gradle أولاً بشكل آمن
+          GRADLE_FILE=$(find . -name "settings.gradle" | head -n 1)
           
-          # توليد ملفات Gradle التنفيذية بالسيرفر
+          if [ -z "$GRADLE_FILE" ]; then
+            echo "❌ خطأ: لم يتم العثور على ملف settings.gradle بعد فك الضغط!"
+            echo "المحتويات الحالية للمجلد لمعرفة المسار الصحيح:"
+            ls -R
+            exit 1
+          fi
+          
+          # استخراج المجلد الأب للملف
+          PROJECT_DIR=$(dirname "$GRADLE_FILE")
+          echo "Android project found at: $PROJECT_DIR"
+          
+          # حفظ المسار فوراً في البيئة للخطوات القادمة
+          echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
+          
+          # الدخول وتجهيز الـ wrapper
+          cd "$PROJECT_DIR"
           gradle wrapper --gradle-version 8.9
           chmod +x ./gradlew
-          
-          # حفظ المسار للخطوات التالية
-          echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
 
       - name: Fix Duplicate Kotlin Classes
         run: |
-          cd ${{ env.PROJECT_DIR }}
+          cd "${{ env.PROJECT_DIR }}"
           # حقن كود حل مشكلة تكرار مكتبات Kotlin داخل ملف build.gradle الافتراضي
           sed -i '/dependencies {/a \    configurations.all { exclude group: "org.jetbrains.kotlin", module: "kotlin-stdlib-jdk8" \n exclude group: "org.jetbrains.kotlin", module: "kotlin-stdlib-jdk7" }' app/build.gradle
 
       - name: Build Debug APK
         run: |
-          cd ${{ env.PROJECT_DIR }}
+          cd "${{ env.PROJECT_DIR }}"
           ./gradlew assembleDebug
 
       - name: Find and Upload APK Artifact
